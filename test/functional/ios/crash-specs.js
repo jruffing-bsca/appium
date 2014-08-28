@@ -2,6 +2,7 @@
 
 var setup = require("../common/setup-base")
   , _ = require("underscore")
+  , ChaiAsserter = require('../../helpers/asserter.js').ChaiAsserter
   , getAppPath = require('../../helpers/app').getAppPath;
 
 describe('crash recovery', function () {
@@ -13,14 +14,20 @@ describe('crash recovery', function () {
   setup(this, desired, {}, {FAST_TESTS: false}).then(function (d) { driver = d; });
 
   it('should be able to recover gracefully from an app crash during shutdown', function (done) {
+
+    var sourceDuringCrash = function () {
+      // sometimes we don't catch the server right while it's shutting down
+      // so keep trying to get the source until we get it in the middle of
+      // a crash
+      return new ChaiAsserter(function () {
+        return driver.sleep(100).source()
+          .should.eventually.be.rejectedWith('13');
+      });
+    };
     driver
       .elementByAccessibilityId("Crash")
       .click()
-      .then(function () {
-        return driver.sleep(500);
-      })
-      .source() // will error because we shut down while responding to this
-        .should.eventually.be.rejectedWith('13')
+      .waitFor(sourceDuringCrash())
     .nodeify(done);
   });
 
